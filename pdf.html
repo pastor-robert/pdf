@@ -128,14 +128,35 @@
         }
 
         .page-item.dragging {
-            opacity: 0.5;
-            transform: rotate(5deg);
+            opacity: 0.8;
+            transform: rotate(5deg) scale(1.05);
             cursor: grabbing;
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
         }
 
-        .page-item.drag-over {
-            border: 2px solid #3498db;
-            background: #ecf0f1;
+        .page-item.drop-indicator-left::before {
+            content: '';
+            position: absolute;
+            left: -8px;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: #e74c3c;
+            border-radius: 2px;
+            box-shadow: 0 0 8px rgba(231, 76, 60, 0.5);
+        }
+
+        .page-item.drop-indicator-right::after {
+            content: '';
+            position: absolute;
+            right: -8px;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: #e74c3c;
+            border-radius: 2px;
+            box-shadow: 0 0 8px rgba(231, 76, 60, 0.5);
         }
 
         .page-preview {
@@ -399,20 +420,63 @@
 
             handlePageDragOver(e) {
                 e.preventDefault();
-                e.currentTarget.classList.add('drag-over');
+                
+                if (!this.draggedElement) return;
+                
+                const rect = e.currentTarget.getBoundingClientRect();
+                const midPoint = rect.left + rect.width / 2;
+                const mouseX = e.clientX;
+                
+                // Clear all existing indicators
+                document.querySelectorAll('.page-item').forEach(el => {
+                    el.classList.remove('drop-indicator-left', 'drop-indicator-right');
+                });
+                
+                // Don't show indicator on the dragged element itself
+                if (e.currentTarget === this.draggedElement) return;
+                
+                // Determine which side to show the indicator
+                if (mouseX < midPoint) {
+                    e.currentTarget.classList.add('drop-indicator-left');
+                } else {
+                    e.currentTarget.classList.add('drop-indicator-right');
+                }
             }
 
             handlePageDrop(e) {
                 e.preventDefault();
-                e.currentTarget.classList.remove('drag-over');
                 
+                // Clear all indicators
+                document.querySelectorAll('.page-item').forEach(el => {
+                    el.classList.remove('drop-indicator-left', 'drop-indicator-right');
+                });
+                
+                if (!this.draggedElement) return;
+                
+                const rect = e.currentTarget.getBoundingClientRect();
+                const midPoint = rect.left + rect.width / 2;
+                const mouseX = e.clientX;
                 const dropIndex = parseInt(e.currentTarget.dataset.index);
                 
-                if (this.draggedIndex !== dropIndex) {
+                let newIndex;
+                if (mouseX < midPoint) {
+                    // Dropping to the left
+                    newIndex = dropIndex;
+                } else {
+                    // Dropping to the right
+                    newIndex = dropIndex + 1;
+                }
+                
+                // Adjust for the fact that we're removing the dragged element first
+                if (this.draggedIndex < newIndex) {
+                    newIndex--;
+                }
+                
+                if (this.draggedIndex !== newIndex) {
                     // Reorder the pages array
                     const draggedPage = this.pages[this.draggedIndex];
                     this.pages.splice(this.draggedIndex, 1);
-                    this.pages.splice(dropIndex, 0, draggedPage);
+                    this.pages.splice(newIndex, 0, draggedPage);
                     
                     this.updateUI();
                 }
@@ -421,7 +485,7 @@
             handleDragEnd(e) {
                 e.currentTarget.classList.remove('dragging');
                 document.querySelectorAll('.page-item').forEach(el => {
-                    el.classList.remove('drag-over');
+                    el.classList.remove('drop-indicator-left', 'drop-indicator-right');
                 });
                 this.draggedElement = null;
                 this.draggedIndex = null;
