@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Page Organizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .upload-area {
+            border: 3px dashed #3498db;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            background: white;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin-bottom: 30px;
+        }
+
+        .upload-area:hover {
+            border-color: #2980b9;
+            background: #f8f9fa;
+        }
+
+        .upload-area.dragover {
+            border-color: #27ae60;
+            background: #d5f4e6;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            color: #3498db;
+            margin-bottom: 15px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #2980b9;
+        }
+
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .pages-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 15px;
+            min-height: 200px;
+        }
+
+        .page-item {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 10px;
+            cursor: grab;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .page-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+
+        .page-item.dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
+            cursor: grabbing;
+        }
+
+        .page-item.drag-over {
+            border: 2px solid #3498db;
+            background: #ecf0f1;
+        }
+
+        .page-preview {
+            width: 100%;
+            height: 200px;
+            object-fit: contain;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+
+        .page-info {
+            text-align: center;
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+
+        .page-number {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(52, 152, 219, 0.9);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+
+        .status.success {
+            background: #d5f4e6;
+            color: #27ae60;
+            border: 1px solid #27ae60;
+        }
+
+        .status.error {
+            background: #fdf2f2;
+            color: #e74c3c;
+            border: 1px solid #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📄 PDF Page Organizer</h1>
+            <p>Upload multiple PDFs, reorder pages by dragging, and download your organized document</p>
+        </div>
+
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📁</div>
+            <h3>Drop PDF files here or click to select</h3>
+            <p>Support for multiple PDF files</p>
+            <input type="file" id="fileInput" class="file-input" multiple accept=".pdf">
+        </div>
+
+        <div id="status"></div>
+
+        <div class="controls" id="controls" style="display: none;">
+            <div>
+                <span id="pageCount">0 pages loaded</span>
+            </div>
+            <div>
+                <button class="btn" id="clearBtn">Clear All</button>
+                <button class="btn btn-success" id="downloadBtn">Download Organized PDF</button>
+            </div>
+        </div>
+
+        <div class="pages-container" id="pagesContainer"></div>
+    </div>
+
+    <script>
+        // Set up PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        class PDFOrganizer {
+            constructor() {
+                this.pages = [];
+                this.draggedElement = null;
+                this.draggedIndex = null;
+                this.initializeEventListeners();
+            }
+
+            initializeEventListeners() {
+                const uploadArea = document.getElementById('uploadArea');
+                const fileInput = document.getElementById('fileInput');
+                const clearBtn = document.getElementById('clearBtn');
+                const downloadBtn = document.getElementById('downloadBtn');
+
+                // Upload area events
+                uploadArea.addEventListener('click', () => fileInput.click());
+                uploadArea.addEventListener('dragover', this.handleDragOver.bind(this));
+                uploadArea.addEventListener('dragleave', this.handleDragLeave.bind(this));
+                uploadArea.addEventListener('drop', this.handleFileDrop.bind(this));
+
+                // File input change
+                fileInput.addEventListener('change', (e) => this.handleFiles(e.target.files));
+
+                // Control buttons
+                clearBtn.addEventListener('click', this.clearAll.bind(this));
+                downloadBtn.addEventListener('click', this.downloadOrganizedPDF.bind(this));
+            }
+
+            handleDragOver(e) {
+                e.preventDefault();
+                document.getElementById('uploadArea').classList.add('dragover');
+            }
+
+            handleDragLeave(e) {
+                e.preventDefault();
+                document.getElementById('uploadArea').classList.remove('dragover');
+            }
+
+            handleFileDrop(e) {
+                e.preventDefault();
+                document.getElementById('uploadArea').classList.remove('dragover');
+                this.handleFiles(e.dataTransfer.files);
+            }
+
+            async handleFiles(files) {
+                const pdfFiles = Array.from(files).filter(file => file.type === 'application/pdf');
+                
+                if (pdfFiles.length === 0) {
+                    this.showStatus('Please select PDF files only.', 'error');
+                    return;
+                }
+
+                this.showStatus('Processing PDF files...', 'loading');
+                
+                try {
+                    for (const file of pdfFiles) {
+                        await this.processPDF(file);
+                    }
+                    this.showStatus(`Successfully loaded ${this.pages.length} pages from ${pdfFiles.length} PDF(s)`, 'success');
+                    this.updateUI();
+                } catch (error) {
+                    console.error('Error processing PDFs:', error);
+                    this.showStatus('Error processing PDF files. Please try again.', 'error');
+                }
+            }
+
+            async processPDF(file) {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+                const pageCount = pdfDoc.getPageCount();
+
+                // Load with PDF.js for rendering thumbnails
+                const pdfJS = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+                for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
+                    const page = await pdfJS.getPage(pageNum);
+                    const viewport = page.getViewport({ scale: 0.5 });
+                    
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+
+                    await page.render({
+                        canvasContext: context,
+                        viewport: viewport
+                    }).promise;
+
+                    this.pages.push({
+                        id: `${file.name}_page_${pageNum}_${Date.now()}`,
+                        fileName: file.name,
+                        pageNumber: pageNum,
+                        totalPages: pageCount,
+                        pdfDoc: pdfDoc,
+                        thumbnail: canvas.toDataURL(),
+                        originalArrayBuffer: arrayBuffer
+                    });
+                }
+            }
+
+            updateUI() {
+                const container = document.getElementById('pagesContainer');
+                const controls = document.getElementById('controls');
+                const pageCount = document.getElementById('pageCount');
+
+                pageCount.textContent = `${this.pages.length} pages loaded`;
+                controls.style.display = this.pages.length > 0 ? 'flex' : 'none';
+
+                container.innerHTML = '';
+
+                this.pages.forEach((page, index) => {
+                    const pageElement = this.createPageElement(page, index);
+                    container.appendChild(pageElement);
+                });
+            }
+
+            createPageElement(page, index) {
+                const div = document.createElement('div');
+                div.className = 'page-item';
+                div.draggable = true;
+                div.dataset.index = index;
+
+                div.innerHTML = `
+                    <div class="page-number">${index + 1}</div>
+                    <img src="${page.thumbnail}" alt="Page ${page.pageNumber}" class="page-preview">
+                    <div class="page-info">
+                        ${page.fileName}<br>
+                        Page ${page.pageNumber} of ${page.totalPages}
+                    </div>
+                `;
+
+                // Drag events
+                div.addEventListener('dragstart', this.handleDragStart.bind(this));
+                div.addEventListener('dragover', this.handlePageDragOver.bind(this));
+                div.addEventListener('drop', this.handlePageDrop.bind(this));
+                div.addEventListener('dragend', this.handleDragEnd.bind(this));
+
+                return div;
+            }
+
+            handleDragStart(e) {
+                this.draggedElement = e.currentTarget;
+                this.draggedIndex = parseInt(e.currentTarget.dataset.index);
+                e.currentTarget.classList.add('dragging');
+            }
+
+            handlePageDragOver(e) {
+                e.preventDefault();
+                e.currentTarget.classList.add('drag-over');
+            }
+
+            handlePageDrop(e) {
+                e.preventDefault();
+                e.currentTarget.classList.remove('drag-over');
+                
+                const dropIndex = parseInt(e.currentTarget.dataset.index);
+                
+                if (this.draggedIndex !== dropIndex) {
+                    // Reorder the pages array
+                    const draggedPage = this.pages[this.draggedIndex];
+                    this.pages.splice(this.draggedIndex, 1);
+                    this.pages.splice(dropIndex, 0, draggedPage);
+                    
+                    this.updateUI();
+                }
+            }
+
+            handleDragEnd(e) {
+                e.currentTarget.classList.remove('dragging');
+                document.querySelectorAll('.page-item').forEach(el => {
+                    el.classList.remove('drag-over');
+                });
+                this.draggedElement = null;
+                this.draggedIndex = null;
+            }
+
+            async downloadOrganizedPDF() {
+                if (this.pages.length === 0) return;
+
+                this.showStatus('Creating organized PDF...', 'loading');
+                
+                try {
+                    const mergedPdf = await PDFLib.PDFDocument.create();
+
+                    for (const pageData of this.pages) {
+                        const sourcePdf = await PDFLib.PDFDocument.load(pageData.originalArrayBuffer);
+                        const [copiedPage] = await mergedPdf.copyPages(sourcePdf, [pageData.pageNumber - 1]);
+                        mergedPdf.addPage(copiedPage);
+                    }
+
+                    const pdfBytes = await mergedPdf.save();
+                    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'organized_document.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+
+                    this.showStatus('PDF downloaded successfully!', 'success');
+                } catch (error) {
+                    console.error('Error creating PDF:', error);
+                    this.showStatus('Error creating PDF. Please try again.', 'error');
+                }
+            }
+
+            clearAll() {
+                this.pages = [];
+                this.updateUI();
+                document.getElementById('fileInput').value = '';
+                this.showStatus('All pages cleared.', 'success');
+            }
+
+            showStatus(message, type) {
+                const statusDiv = document.getElementById('status');
+                
+                if (type === 'loading') {
+                    statusDiv.innerHTML = `
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            ${message}
+                        </div>
+                    `;
+                } else {
+                    statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+                    
+                    if (type !== 'error') {
+                        setTimeout(() => {
+                            statusDiv.innerHTML = '';
+                        }, 3000);
+                    }
+                }
+            }
+        }
+
+        // Initialize the PDF organizer
+        const pdfOrganizer = new PDFOrganizer();
+    </script>
+</body>
+</html>
