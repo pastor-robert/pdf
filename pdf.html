@@ -164,6 +164,18 @@
             font-weight: bold;
         }
 
+        .new-position {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            background: rgba(39, 174, 96, 0.9);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
         .loading {
             text-align: center;
             padding: 40px;
@@ -361,11 +373,12 @@
                 div.dataset.index = index;
 
                 div.innerHTML = `
-                    <div class="page-number">${index + 1}</div>
+                    <div class="new-position">${index + 1}</div>
+                    <div class="page-number">${page.pageNumber}</div>
                     <img src="${page.thumbnail}" alt="Page ${page.pageNumber}" class="page-preview">
                     <div class="page-info">
                         ${page.fileName}<br>
-                        Page ${page.pageNumber} of ${page.totalPages}
+                        Original Page ${page.pageNumber} of ${page.totalPages}
                     </div>
                 `;
 
