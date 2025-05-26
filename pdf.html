@@ -338,12 +338,16 @@
             }
 
             async processPDF(file) {
-                const arrayBuffer = await file.arrayBuffer();
-                const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
-                const pageCount = pdfDoc.getPageCount();
+                const originalArrayBuffer = await file.arrayBuffer();
+                
+                // Create separate copies for PDF-lib and PDF.js to avoid buffer conflicts
+                const pdfLibBuffer = originalArrayBuffer.slice();
+                const pdfJSBuffer = originalArrayBuffer.slice();
+                
+                const pageCount = (await PDFLib.PDFDocument.load(pdfLibBuffer)).getPageCount();
 
                 // Load with PDF.js for rendering thumbnails
-                const pdfJS = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const pdfJS = await pdfjsLib.getDocument({ data: pdfJSBuffer }).promise;
 
                 for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
                     const page = await pdfJS.getPage(pageNum);
@@ -359,14 +363,16 @@
                         viewport: viewport
                     }).promise;
 
+                    // Create a fresh copy for each page to avoid any sharing issues
+                    const pageBuffer = originalArrayBuffer.slice();
+
                     this.pages.push({
                         id: `${file.name}_page_${pageNum}_${Date.now()}`,
                         fileName: file.name,
                         pageNumber: pageNum,
                         totalPages: pageCount,
-                        pdfDoc: pdfDoc,
                         thumbnail: canvas.toDataURL(),
-                        originalArrayBuffer: arrayBuffer
+                        originalArrayBuffer: pageBuffer
                     });
                 }
             }
